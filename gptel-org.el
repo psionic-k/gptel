@@ -48,6 +48,7 @@
 (declare-function gptel--intern "gptel")
 (declare-function gptel--get-buffer-bounds "gptel")
 (declare-function gptel-backend-name "gptel")
+(declare-function gptel--strip-ignored "gptel")
 (declare-function gptel--parse-buffer "gptel")
 (declare-function gptel--parse-directive "gptel")
 (declare-function org-entry-get "org")
@@ -223,18 +224,27 @@ value of `gptel-org-branching-context', which see."
                               gptel-track-media
                               (buffer-local-value 'gptel-track-media org-buf))
                   (cl-loop for start in start-bounds
-                           for end   in end-bounds
+                           for end in end-bounds
                            do (insert-buffer-substring org-buf start end)
                            (goto-char (point-min)))
+                  (gptel--strip-ignored)
                   (goto-char (point-max))
                   (let ((major-mode 'org-mode))
                     (gptel--parse-buffer gptel-backend max-entries)))))
           (display-warning
-             '(gptel org)
-             "Using `gptel-org-branching-context' requires Org version 9.7 or higher, it will be ignored.")
-          (gptel--parse-buffer gptel-backend max-entries))
+           '(gptel org)
+           "Using `gptel-org-branching-context' requires Org version 9.7 or higher, it will be ignored.")
+          (let ((buffer (current-buffer)))
+            (with-temp-buffer
+              (insert-buffer-substring buffer)
+              (gptel--strip-ignored)
+              (gptel--parse-buffer gptel-backend max-entries))))
       ;; Create prompt the usual way
-      (gptel--parse-buffer gptel-backend max-entries))))
+      (let ((buffer (current-buffer)))
+        (with-temp-buffer
+          (insert-buffer-substring buffer)
+          (gptel--strip-ignored)
+          (gptel--parse-buffer gptel-backend max-entries))))))
 
 ;; Handle media links in the buffer
 (cl-defmethod gptel--parse-media-links ((_mode (eql 'org-mode)) beg end)

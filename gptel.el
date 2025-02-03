@@ -1882,7 +1882,8 @@ No state transition here since that's handled by the process sentinels."
         (pulse-momentary-highlight-region start-marker tracking-marker)
         (when gptel-mode
           (save-excursion (goto-char tracking-marker)
-                          (insert "\n\n" (gptel-prompt-prefix-string)))
+                          (insert gptel-response-separator
+                                  (gptel-prompt-prefix-string)))
           (gptel--update-status  " Ready" 'success))))
     ;; Run hook in visible window to set window-point, BUG #269
     (if-let* ((gptel-window (get-buffer-window gptel-buffer 'visible)))
@@ -2361,6 +2362,14 @@ See `gptel--url-get-response' for details."
      ((consp response)                  ;tool call or tool result?
       (gptel--display-tool-calls response info)))))
 
+(defun gptel--strip-ignored ()
+  "Delete all regions marked with the 'gptel-ignore property."
+  (save-excursion
+    (goto-char (point-min))
+    (while-let ((found (text-property-search-forward 'gptel-ignore)))
+      (delete-region (prop-match-beginning found)
+                     (prop-match-end found)))))
+
 (defun gptel--create-prompt (&optional prompt-end)
   "Return a full conversation prompt from the contents of this buffer.
 
@@ -2811,13 +2820,22 @@ for tool call results.  INFO contains the state of the request."
            with include-names =
            (mapcar #'gptel-tool-name
                    (cl-remove-if-not #'gptel-tool-include (plist-get info :tools)))
+           with separator = (save-excursion
+                              (goto-char (or tracking-marker start-marker))
+                              (unless (looking-at-p "^$") "\n"))
            if (or (eq gptel-include-tool-results t) (member name include-names))
            do (funcall
                (plist-get info :callback)
                (if (derived-mode-p 'org-mode)
-                   (concat "\n:TOOL_CALL:\n" (gptel--format-tool-call name args)
-                           "\n" (gptel--to-string result) "\n:END:\n")
-                 (concat "\n```\n" name "\n" (gptel--to-string result) "\n```"))
+                   (concat
+                    separator
+                    (propertize ":TOOL_CALL:\n" 'gptel-ignore t)
+                    (gptel--format-tool-call name args)
+                    "\n" (gptel--to-string result) "\n"
+                    (propertize ":END:\n" 'gptel-ignore t))
+                 (concat
+                  separator
+                  "```\n" name "\n" (gptel--to-string result) "\n```"))
                info)
            (when (derived-mode-p 'org-mode) ;fold drawer
              (ignore-errors
