@@ -1956,7 +1956,6 @@ Run post-response hooks."
        (lambda (tool-call)
          (letrec ((name (plist-get tool-call :name))
                   (args (plist-get tool-call :args))
-                  (id (plist-get tool-call :id))
                   (arg-values)
                   (process-tool-result
                    (lambda (result)
@@ -1965,7 +1964,7 @@ Run post-response hooks."
                      ;; And using a flat list instead of plist isn't my first
                      ;; choice below.
                      (plist-put tool-call :result (gptel--to-string result))
-                     (push (list name arg-values result id) result-alist)
+                     (push (list name arg-values result tool-call) result-alist)
                      (cl-incf tool-idx)
                      (when (>= tool-idx ntools) ; All tools have run
                        (gptel--inject-prompt
@@ -2818,7 +2817,11 @@ for tool call results.  INFO contains the state of the request."
       (when gptel-include-tool-results
         (with-current-buffer (marker-buffer start-marker)
           (cl-loop
-           for (name args result id) in response
+           ;; (list _name arg-values result tool-call)
+           for (name _ result tool-call) in response
+           with name = (plist-get tool-call :name)
+           with args = (plist-get tool-call :args)
+           ;; XXX review global `gptel-include-tool-results' and per-tool :include
            with include-names =
            (mapcar #'gptel-tool-name
                    (cl-remove-if-not #'gptel-tool-include (plist-get info :tools)))
@@ -2831,15 +2834,20 @@ for tool call results.  INFO contains the state of the request."
                (if (derived-mode-p 'org-mode)
                    (concat
                     separator
-                    (propertize
-                     (concat ":TOOL_CALL:\n" (gptel--format-tool-call name args) "\n")
-                     'gptel 'ignore)
-                     (propertize (gptel--to-string result) 'gptel `(tool ,id))
+                    (propertize ":TOOL_CALL:\n" 'gptel 'ignore)
+                    (propertize (prin1-to-string `(:name ,name :arguments ,args))
+                                'gptel `(tool-call ,(plist-get tool-call :id)))
+                    (propertize "\n" 'gptel 'ignore)
+                    (propertize (gptel--to-string result) 'gptel
+                                `(tool-result ,(plist-get tool-call :id)))
                     (propertize "\n:END:\n" 'gptel 'ignore))
                  (concat
                   separator
-                  (propertize (concat "```\n" name "\n") 'gptel 'ignore)
-                  (propertize (gptel--to-string result) 'gptel `(tool ,id))
+                  (propertize "```\n" 'gptel 'ignore)
+                  (propertize (prin1-to-string `(:name ,name :args ,args))
+                              'gptel `(tool-call ,(plist-get tool-call :id)))
+                  (propertize (gptel--to-string result) 'gptel
+                              `(tool-result ,(plist-get tool-call :id)))
                   (propertize 'gptel 'ignore "\n```")))
                info)
            (when (derived-mode-p 'org-mode) ;fold drawer

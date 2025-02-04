@@ -335,7 +335,23 @@ Mutate state INFO with response metadata."
                                                                    (prop-match-end prop)))
                              prompts))
             ('ignore)
-            (`(tool ,id) (push (list :role "tool"
+            (`(tool-call ,id)
+             (condition-case-unless-debug _err
+                 (let* ((tool-call (read-from-string (buffer-substring-no-properties
+                                                      (prop-match-beginning prop)
+                                                      (prop-match-end prop))))
+                        (function (car tool-call))
+                        (name (plist-get function :name))
+                        (arguments (json-serialize (plist-get function :arguments))))
+                   (push (list :role "assistant"
+                               :tool_calls
+                               (vector (list :type "function" :id id
+                                             :function `( :name ,name
+                                                          :arguments ,arguments))))
+                         prompts))
+               (parse-error (delay-warning '(gptel gptel-context)
+                                           "Could not parse tool-call" 'error (current-buffer)))))
+            (`(tool-result ,id) (push (list :role "tool"
                                      :tool_call_id id
                                      :content
                                      (buffer-substring-no-properties (prop-match-beginning prop)
