@@ -1961,10 +1961,11 @@ Run post-response hooks."
                   (process-tool-result
                    (lambda (result)
                      (plist-put info :tool-success t)
-                     (plist-put tool-call :result (propertize
-                                                   (gptel--to-string result)
-                                                   'gptel `(tool ,id)))
-                     (push (list name arg-values result) result-alist)
+                     ;; Aren't we double string-processing the result?
+                     ;; And using a flat list instead of plist isn't my first
+                     ;; choice below.
+                     (plist-put tool-call :result (gptel--to-string result))
+                     (push (list name arg-values result id) result-alist)
                      (cl-incf tool-idx)
                      (when (>= tool-idx ntools) ; All tools have run
                        (gptel--inject-prompt
@@ -2813,12 +2814,11 @@ for tool call results.  INFO contains the state of the request."
                                  (when (search-forward-regexp "^:tool-use" nil t)
                                    (forward-line 0)
                                    (hl-line-highlight)))))))))
-      ;; finished tool call results look like ((name . result) ...)
       ;; Insert tool results
       (when gptel-include-tool-results
         (with-current-buffer (marker-buffer start-marker)
           (cl-loop
-           for (name args result) in response
+           for (name args result id) in response
            with include-names =
            (mapcar #'gptel-tool-name
                    (cl-remove-if-not #'gptel-tool-include (plist-get info :tools)))
@@ -2831,15 +2831,15 @@ for tool call results.  INFO contains the state of the request."
                (if (derived-mode-p 'org-mode)
                    (concat
                     separator
-                    (propertize ":TOOL_CALL:\n" 'gptel 'ignore)
-                    (propertize (gptel--format-tool-call name args)
-                                'gptel 'ignore)
-                    "\n" (gptel--to-string result) "\n"
-                    (propertize ":END:\n" 'gptel 'ignore))
+                    (propertize
+                     (concat ":TOOL_CALL:\n" (gptel--format-tool-call name args) "\n")
+                     'gptel 'ignore)
+                     (propertize (gptel--to-string result) 'gptel `(tool ,id))
+                    (propertize "\n:END:\n" 'gptel 'ignore))
                  (concat
                   separator
                   (propertize (concat "```\n" name "\n") 'gptel 'ignore)
-                  (gptel--to-string result)
+                  (propertize (gptel--to-string result) 'gptel `(tool ,id))
                   (propertize 'gptel 'ignore "\n```")))
                info)
            (when (derived-mode-p 'org-mode) ;fold drawer

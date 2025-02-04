@@ -306,7 +306,7 @@ Mutate state INFO with response metadata."
      (list
       :role "tool"
       :content (plist-get tool-call :result)
-      :id (plist-get tool-call :id)))
+      :tool_call_id (plist-get tool-call :id)))
    tool-use))
 
 ;; NOTE: No `gptel--inject-prompt' method required for gptel-openai, since this
