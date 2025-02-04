@@ -326,31 +326,34 @@ Mutate state INFO with response metadata."
     (if (or gptel-mode gptel-track-response)
         (while (and
                 (or (not max-entries) (>= max-entries 0))
-                (setq prop (text-property-search-backward
-                            'gptel 'response
-                            (when (get-char-property (max (point-min) (1- (point)))
-                                                     'gptel)
-                              t))))
-          (if (prop-match-value prop)   ;assistant role
-              (push (list :role "assistant"
-                          :content
-                          (buffer-substring-no-properties (prop-match-beginning prop)
-                                                          (prop-match-end prop)))
-                    prompts)
-            (if include-media
-                (push (list :role "user"
-                            :content
-                            (gptel--openai-parse-multipart
-                             (gptel--parse-media-links
-                              major-mode (prop-match-beginning prop) (prop-match-end prop))))
-                      prompts)
-              (push (list :role "user"
-                          :content
-                          (gptel--trim-prefixes
+                (setq prop (text-property-search-backward 'gptel)))
+          (pcase (prop-match-value prop)
+            ('response (push (list :role "assistant"
+                           :content
                            (buffer-substring-no-properties (prop-match-beginning prop)
-                                                           (prop-match-end prop))))
-                    prompts)))
-          (and max-entries (cl-decf max-entries)))
+                                                           (prop-match-end prop)))
+                     prompts))
+            ('ignore)
+            (`(tool ,id) (push (list :role "tool"
+                                     :tool_call_id id
+                                     :content
+                                     (buffer-substring-no-properties (prop-match-beginning prop)
+                                                                     (prop-match-end prop)))
+                               prompts))
+            (_ (if include-media
+                    (push (list :role "user"
+                                :content
+                                (gptel--openai-parse-multipart
+                                 (gptel--parse-media-links
+                                  major-mode (prop-match-beginning prop) (prop-match-end prop))))
+                          prompts)
+                  (push (list :role "user"
+                              :content
+                              (gptel--trim-prefixes
+                               (buffer-substring-no-properties (prop-match-beginning prop)
+                                                               (prop-match-end prop))))
+                        prompts))
+                (cl-decf max-entries))))
       (push (list :role "user"
                   :content
                   (gptel--trim-prefixes (buffer-substring-no-properties (point-min) (point-max))))

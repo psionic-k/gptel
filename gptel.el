@@ -1949,11 +1949,14 @@ Run post-response hooks."
        (lambda (tool-call)
          (letrec ((name (plist-get tool-call :name))
                   (args (plist-get tool-call :args))
+                  (id (plist-get tool-call :id))
                   (arg-values)
                   (process-tool-result
                    (lambda (result)
                      (plist-put info :tool-success t)
-                     (plist-put tool-call :result (gptel--to-string result))
+                     (plist-put tool-call :result (propertize
+                                                   (gptel--to-string result)
+                                                   'gptel `(tool ,id)))
                      (push (list name arg-values result) result-alist)
                      (cl-incf tool-idx)
                      (when (>= tool-idx ntools) ; All tools have run
@@ -2821,13 +2824,16 @@ for tool call results.  INFO contains the state of the request."
                (if (derived-mode-p 'org-mode)
                    (concat
                     separator
-                    (propertize ":TOOL_CALL:\n" 'gptel-ignore t)
-                    (gptel--format-tool-call name args)
+                    (propertize ":TOOL_CALL:\n" 'gptel 'ignore)
+                    (propertize (gptel--format-tool-call name args)
+                                'gptel 'ignore)
                     "\n" (gptel--to-string result) "\n"
-                    (propertize ":END:\n" 'gptel-ignore t))
+                    (propertize ":END:\n" 'gptel 'ignore))
                  (concat
                   separator
-                  "```\n" name "\n" (gptel--to-string result) "\n```"))
+                  (propertize (concat "```\n" name "\n") 'gptel 'ignore)
+                  (gptel--to-string result)
+                  (propertize 'gptel 'ignore "\n```")))
                info)
            (when (derived-mode-p 'org-mode) ;fold drawer
              (ignore-errors
