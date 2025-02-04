@@ -234,17 +234,9 @@ value of `gptel-org-branching-context', which see."
           (display-warning
            '(gptel org)
            "Using `gptel-org-branching-context' requires Org version 9.7 or higher, it will be ignored.")
-          (let ((buffer (current-buffer)))
-            (with-temp-buffer
-              (insert-buffer-substring buffer)
-              (gptel--strip-ignored)
-              (gptel--parse-buffer gptel-backend max-entries))))
+          (gptel--parse-buffer gptel-backend max-entries))
       ;; Create prompt the usual way
-      (let ((buffer (current-buffer)))
-        (with-temp-buffer
-          (insert-buffer-substring buffer)
-          (gptel--strip-ignored)
-          (gptel--parse-buffer gptel-backend max-entries))))))
+      (gptel--parse-buffer gptel-backend max-entries))))
 
 ;; Handle media links in the buffer
 (cl-defmethod gptel--parse-media-links ((_mode (eql 'org-mode)) beg end)

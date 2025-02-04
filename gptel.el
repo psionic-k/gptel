@@ -2362,14 +2362,6 @@ See `gptel--url-get-response' for details."
      ((consp response)                  ;tool call or tool result?
       (gptel--display-tool-calls response info)))))
 
-(defun gptel--strip-ignored ()
-  "Delete all regions marked with the 'gptel-ignore property."
-  (save-excursion
-    (goto-char (point-min))
-    (while-let ((found (text-property-search-forward 'gptel-ignore)))
-      (delete-region (prop-match-beginning found)
-                     (prop-match-end found)))))
-
 (defun gptel--create-prompt (&optional prompt-end)
   "Return a full conversation prompt from the contents of this buffer.
 
