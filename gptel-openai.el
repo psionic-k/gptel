@@ -245,7 +245,7 @@ Mutate state INFO with response metadata."
                (map-nested-elt response '(:usage :completion_tokens)))
     ;; OpenAI returns either non-blank text content or a tool call, not both
     (if (and content (not (or (eq content :null) (string-empty-p content))))
-        content
+        (propertize content 'gptel 'response 'font-sticky '(gptel))
       (prog1 nil                        ; Look for tool calls only if no content
         (when-let* ((tool-calls (plist-get message :tool_calls)))
           (gptel--inject-prompt    ; First add the tool call to the prompts list
@@ -306,7 +306,7 @@ Mutate state INFO with response metadata."
      (list
       :role "tool"
       :content (plist-get tool-call :result)
-      :tool_call_id (plist-get tool-call :id)))
+      :id (plist-get tool-call :id)))
    tool-use))
 
 ;; NOTE: No `gptel--inject-prompt' method required for gptel-openai, since this
@@ -326,13 +326,14 @@ Mutate state INFO with response metadata."
     (if (or gptel-mode gptel-track-response)
         (while (and
                 (or (not max-entries) (>= max-entries 0))
-                (setq prop (text-property-search-backward 'gptel)))
+                (setq prop (text-property-search-backward
+                            'gptel (get-char-property (max (point-min) (1- (point))) 'gptel) t)))
           (pcase (prop-match-value prop)
             ('response (push (list :role "assistant"
-                           :content
-                           (buffer-substring-no-properties (prop-match-beginning prop)
-                                                           (prop-match-end prop)))
-                     prompts))
+                                   :content
+                                   (buffer-substring-no-properties (prop-match-beginning prop)
+                                                                   (prop-match-end prop)))
+                             prompts))
             ('ignore)
             (`(tool ,id) (push (list :role "tool"
                                      :tool_call_id id
@@ -341,19 +342,19 @@ Mutate state INFO with response metadata."
                                                                      (prop-match-end prop)))
                                prompts))
             (_ (if include-media
-                    (push (list :role "user"
-                                :content
-                                (gptel--openai-parse-multipart
-                                 (gptel--parse-media-links
-                                  major-mode (prop-match-beginning prop) (prop-match-end prop))))
-                          prompts)
-                  (push (list :role "user"
-                              :content
-                              (gptel--trim-prefixes
-                               (buffer-substring-no-properties (prop-match-beginning prop)
-                                                               (prop-match-end prop))))
-                        prompts))
-                (cl-decf max-entries))))
+                   (push (list :role "user"
+                               :content
+                               (gptel--openai-parse-multipart
+                                (gptel--parse-media-links
+                                 major-mode (prop-match-beginning prop) (prop-match-end prop))))
+                         prompts)
+                 (push (list :role "user"
+                             :content
+                             (gptel--trim-prefixes
+                              (buffer-substring-no-properties (prop-match-beginning prop)
+                                                              (prop-match-end prop))))
+                       prompts))
+               (and max-entries (cl-decf max-entries)))))
       (push (list :role "user"
                   :content
                   (gptel--trim-prefixes (buffer-substring-no-properties (point-min) (point-max))))

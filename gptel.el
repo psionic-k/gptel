@@ -373,7 +373,8 @@ is only inserted in dedicated gptel buffers before the AI's response."
   :type '(alist :key-type symbol :value-type string))
 
 (defcustom gptel-response-separator "\n\n"
-  "String inserted before responses.")
+  "String inserted before responses."
+  :type 'string)
 
 (defcustom gptel-use-header-line t
   "Whether `gptel-mode' should use header-line for status information.
@@ -906,11 +907,17 @@ Note: This will move the cursor."
 
 (defun gptel-prompt-prefix-string ()
   "Prefix before user prompts in `gptel-mode'."
-  (or (alist-get major-mode gptel-prompt-prefix-alist) ""))
+  (propertize (or (alist-get major-mode gptel-prompt-prefix-alist) "")
+              'gptel 'ignore))
 
 (defun gptel-response-prefix-string ()
   "Prefix before LLM responses in `gptel-mode'."
-  (or (alist-get major-mode gptel-response-prefix-alist) ""))
+  (propertize (or (alist-get major-mode gptel-response-prefix-alist) "")
+              'gptel 'ignore))
+
+(defun gptel-response-separator ()
+  "Separator before responses begin."
+  (propertize gptel-response-separator 'gptel 'ignore 'front-sticky '(gptel)))
 
 (defsubst gptel--trim-prefixes (s)
   "Remove prompt/response prefixes from string S."
@@ -1882,7 +1889,7 @@ No state transition here since that's handled by the process sentinels."
         (pulse-momentary-highlight-region start-marker tracking-marker)
         (when gptel-mode
           (save-excursion (goto-char tracking-marker)
-                          (insert gptel-response-separator
+                          (insert (gptel-response-separator)
                                   (gptel-prompt-prefix-string)))
           (gptel--update-status  " Ready" 'success))))
     ;; Run hook in visible window to set window-point, BUG #269
@@ -2345,7 +2352,7 @@ See `gptel--url-get-response' for details."
         (when-let* ((transformer (plist-get info :transformer)))
           (setq response (funcall transformer response)))
         (when tracking-marker           ;separate from previous response
-          (setq response (concat gptel-response-separator response)))
+          (setq response (concat (gptel-response-separator) response)))
         (save-excursion
           (add-text-properties
            0 (length response) '(gptel response front-sticky (gptel)) response)
@@ -2354,7 +2361,7 @@ See `gptel--url-get-response' for details."
             ;; (run-hooks 'gptel-pre-response-hook)
             (unless (or (bobp) (plist-get info :in-place)
                         tracking-marker)
-              (insert gptel-response-separator)
+              (insert (gptel-response-separator))
               (when gptel-mode
                 (insert (gptel-response-prefix-string)))
               (move-marker start-marker (point)))

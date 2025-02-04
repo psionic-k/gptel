@@ -239,7 +239,7 @@ See `gptel--url-get-response' for details."
           (unless tracking-marker
             (goto-char start-marker)
             (unless (or (bobp) (plist-get info :in-place))
-              (insert gptel-response-separator)
+              (insert (gptel-response-separator))
               (when gptel-mode
                 ;; Put prefix before AI response.
                 (insert (gptel-response-prefix-string)))
@@ -250,10 +250,6 @@ See `gptel--url-get-response' for details."
 
           (when transformer
             (setq response (funcall transformer response)))
-
-          (add-text-properties
-           0 (length response) '(gptel response front-sticky (gptel))
-           response)
           (goto-char tracking-marker)
           ;; (run-hooks 'gptel-pre-stream-hook)
           (insert response)
