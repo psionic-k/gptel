@@ -245,7 +245,7 @@ Mutate state INFO with response metadata."
                (map-nested-elt response '(:usage :completion_tokens)))
     ;; OpenAI returns either non-blank text content or a tool call, not both
     (if (and content (not (or (eq content :null) (string-empty-p content))))
-        (propertize content 'gptel 'response 'font-sticky '(gptel))
+        content
       (prog1 nil                        ; Look for tool calls only if no content
         (when-let* ((tool-calls (plist-get message :tool_calls)))
           (gptel--inject-prompt    ; First add the tool call to the prompts list

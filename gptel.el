@@ -2849,7 +2849,9 @@ for tool call results.  INFO contains the state of the request."
                   (propertize (gptel--to-string result) 'gptel
                               `(tool-result ,(plist-get tool-call :id)))
                   (propertize 'gptel 'ignore "\n```")))
-               info)
+               info
+               ;; Inserted tool calls are propertized by the front-end
+               'no-props)
            (when (derived-mode-p 'org-mode) ;fold drawer
              (ignore-errors
                (save-excursion

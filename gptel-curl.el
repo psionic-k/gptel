@@ -224,11 +224,13 @@ PROCESS and _STATUS are process parameters."
     (setf (alist-get process gptel--request-alist nil 'remove) nil)
     (kill-buffer proc-buf)))
 
-(defun gptel-curl--stream-insert-response (response info)
+(defun gptel-curl--stream-insert-response (response info &optional no-props)
   "Insert streaming RESPONSE from an LLM into the gptel buffer.
 
 INFO is a mutable plist containing information relevant to this buffer.
-See `gptel--url-get-response' for details."
+See `gptel--url-get-response' for details.
+
+Optional NO-PROPS indicated that input is already propertized."
   (cond
    ((stringp response)
     (let ((start-marker (plist-get info :position))
@@ -250,6 +252,10 @@ See `gptel--url-get-response' for details."
 
           (when transformer
             (setq response (funcall transformer response)))
+          (unless no-props
+            (add-text-properties
+             0 (length response) '(gptel response front-sticky (gptel))
+             response))
           (goto-char tracking-marker)
           ;; (run-hooks 'gptel-pre-stream-hook)
           (insert response)
