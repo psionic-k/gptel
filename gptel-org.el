@@ -227,14 +227,28 @@ value of `gptel-org-branching-context', which see."
                            do (insert-buffer-substring org-buf start end)
                            (goto-char (point-min)))
                   (goto-char (point-max))
+                  ;; XXX why front-end mode must be turned on here?
+                  (gptel--org-unescape-tool-results)
                   (let ((major-mode 'org-mode))
                     (gptel--parse-buffer gptel-backend max-entries)))))
           (display-warning
            '(gptel org)
            "Using `gptel-org-branching-context' requires Org version 9.7 or higher, it will be ignored.")
-          (gptel--parse-buffer gptel-backend max-entries))
+          (let ((source (current-buffer))
+                (beg (point-min))
+                (end (point-max)))
+            (with-temp-buffer
+              (insert-buffer-substring source beg end)
+              (gptel--org-unescape-tool-results)
+              (gptel--parse-buffer gptel-backend max-entries))))
       ;; Create prompt the usual way
-      (gptel--parse-buffer gptel-backend max-entries))))
+      (let ((source (current-buffer))
+            (beg (point-min))
+            (end (point-max)))
+        (with-temp-buffer
+          (insert-buffer-substring source beg end)
+          (gptel--org-unescape-tool-results)
+          (gptel--parse-buffer gptel-backend max-entries))))))
 
 ;; Handle media links in the buffer
 (cl-defmethod gptel--parse-media-links ((_mode (eql 'org-mode)) beg end)
@@ -623,6 +637,17 @@ cleaning up after."
               (buffer-substring (point) start-pt)
             (prog1 (buffer-substring (point) (point-max))
                    (set-marker start-pt (point-max)))))))))
+
+(defun gptel--org-unescape-tool-results ()
+  "Undo escapes done to keep results from escaping blocks."
+  (cl-labels ((tool-result-p (_value property)
+                (and (listp property)
+                     (eq (car property) 'tool-result))))
+    (save-excursion
+      (goto-char (point-min))
+      (while-let ((found (text-property-search-forward 'gptel nil #'tool-result-p)))
+        (org-unescape-code-in-region (prop-match-beginning found)
+                                     (prop-match-end found))))))
 
 (provide 'gptel-org)
 ;;; gptel-org.el ends here

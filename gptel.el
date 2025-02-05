@@ -908,12 +908,12 @@ Note: This will move the cursor."
 (defun gptel-prompt-prefix-string ()
   "Prefix before user prompts in `gptel-mode'."
   (propertize (or (alist-get major-mode gptel-prompt-prefix-alist) "")
-              'gptel 'ignore))
+              'gptel 'ignore 'rear-nonsticky '(gptel)))
 
 (defun gptel-response-prefix-string ()
   "Prefix before LLM responses in `gptel-mode'."
   (propertize (or (alist-get major-mode gptel-response-prefix-alist) "")
-              'gptel 'ignore))
+              'gptel 'ignore 'rear-nonsticky '(gptel)))
 
 (defun gptel-response-separator ()
   "Separator before responses begin."
@@ -2819,7 +2819,6 @@ for tool call results.  INFO contains the state of the request."
           (cl-loop
            ;; (list _name arg-values result tool-call)
            for (name _ result tool-call) in response
-           do (message "Tool-call: %s" tool-call)
            ;; XXX review global `gptel-include-tool-results' and per-tool :include
            with include-names =
            (mapcar #'gptel-tool-name
@@ -2833,14 +2832,14 @@ for tool call results.  INFO contains the state of the request."
                (if (derived-mode-p 'org-mode)
                    (concat
                     separator
-                    (propertize ":TOOL_CALL:\n" 'gptel 'ignore)
+                    (propertize "#+begin_tool_call " 'gptel 'ignore)
                     (propertize (prin1-to-string `(:name ,name :arguments
                                                          ,(plist-get tool-call :args)))
                                 'gptel `(tool-call ,(plist-get tool-call :id)))
                     (propertize "\n" 'gptel 'ignore)
-                    (propertize (gptel--to-string result) 'gptel
+                    (propertize (org-escape-code-in-string (gptel--to-string result)) 'gptel
                                 `(tool-result ,(plist-get tool-call :id)))
-                    (propertize "\n:END:\n" 'gptel 'ignore))
+                    (propertize "\n#+end_tool_call\n" 'gptel 'ignore))
                  (concat
                   separator
                   (propertize "```\n" 'gptel 'ignore)
@@ -2851,13 +2850,16 @@ for tool call results.  INFO contains the state of the request."
                   (propertize 'gptel 'ignore "\n```")))
                info
                ;; Inserted tool calls are propertized by the front-end
-               'no-props)
+               'no-props
+               'no-transform)
            (when (derived-mode-p 'org-mode) ;fold drawer
              (ignore-errors
                (save-excursion
                  (goto-char (plist-get info :tracking-marker))
                  (forward-line -1) ;org-fold-hide-drawer-toggle requires Emacs 29.1
-                 (when (looking-at "^:END:") (org-cycle)))))))))))
+                 (let ((buffer-invisibility-spec nil))
+                   (when (looking-at "^#\\+end_tool_call")
+                     (org-cycle))))))))))))
 
 (defun gptel--format-tool-call (name arg-values)
   "Format a tool call for display in the buffer.
