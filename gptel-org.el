@@ -48,7 +48,6 @@
 (declare-function gptel--intern "gptel")
 (declare-function gptel--get-buffer-bounds "gptel")
 (declare-function gptel-backend-name "gptel")
-(declare-function gptel--strip-ignored "gptel")
 (declare-function gptel--parse-buffer "gptel")
 (declare-function gptel--parse-directive "gptel")
 (declare-function org-entry-get "org")
@@ -227,7 +226,6 @@ value of `gptel-org-branching-context', which see."
                            for end in end-bounds
                            do (insert-buffer-substring org-buf start end)
                            (goto-char (point-min)))
-                  (gptel--strip-ignored)
                   (goto-char (point-max))
                   (let ((major-mode 'org-mode))
                     (gptel--parse-buffer gptel-backend max-entries)))))

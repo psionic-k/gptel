@@ -2819,8 +2819,7 @@ for tool call results.  INFO contains the state of the request."
           (cl-loop
            ;; (list _name arg-values result tool-call)
            for (name _ result tool-call) in response
-           with name = (plist-get tool-call :name)
-           with args = (plist-get tool-call :args)
+           do (message "Tool-call: %s" tool-call)
            ;; XXX review global `gptel-include-tool-results' and per-tool :include
            with include-names =
            (mapcar #'gptel-tool-name
@@ -2835,7 +2834,8 @@ for tool call results.  INFO contains the state of the request."
                    (concat
                     separator
                     (propertize ":TOOL_CALL:\n" 'gptel 'ignore)
-                    (propertize (prin1-to-string `(:name ,name :arguments ,args))
+                    (propertize (prin1-to-string `(:name ,name :arguments
+                                                         ,(plist-get tool-call :args)))
                                 'gptel `(tool-call ,(plist-get tool-call :id)))
                     (propertize "\n" 'gptel 'ignore)
                     (propertize (gptel--to-string result) 'gptel
@@ -2844,7 +2844,7 @@ for tool call results.  INFO contains the state of the request."
                  (concat
                   separator
                   (propertize "```\n" 'gptel 'ignore)
-                  (propertize (prin1-to-string `(:name ,name :args ,args))
+                  (propertize (prin1-to-string `(:name ,name :args ,(plist-get tool-call :args)))
                               'gptel `(tool-call ,(plist-get tool-call :id)))
                   (propertize (gptel--to-string result) 'gptel
                               `(tool-result ,(plist-get tool-call :id)))

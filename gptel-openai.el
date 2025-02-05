@@ -352,11 +352,11 @@ Mutate state INFO with response metadata."
                (parse-error (delay-warning '(gptel gptel-context)
                                            "Could not parse tool-call" 'error (current-buffer)))))
             (`(tool-result ,id) (push (list :role "tool"
-                                     :tool_call_id id
-                                     :content
-                                     (buffer-substring-no-properties (prop-match-beginning prop)
-                                                                     (prop-match-end prop)))
-                               prompts))
+                                            :tool_call_id id
+                                            :content
+                                            (buffer-substring-no-properties (prop-match-beginning prop)
+                                                                            (prop-match-end prop)))
+                                      prompts))
             (_ (if include-media
                    (push (list :role "user"
                                :content
