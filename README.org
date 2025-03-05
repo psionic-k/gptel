@@ -1,7 +1,47 @@
-#+title: gptel: A simple LLM client for Emacs
+#+title: gptel: The Fork
 
-[[https://elpa.nongnu.org/nongnu/gptel.html][file:https://elpa.nongnu.org/nongnu/gptel.svg]] [[https://stable.melpa.org/#/gptel][file:https://stable.melpa.org/packages/gptel-badge.svg]] [[https://melpa.org/#/gptel][file:https://melpa.org/packages/gptel-badge.svg]]
+PRs are accepted.  Be sure to allow edits when setting up PRs.  You may file issues before working on features to validate the scope / nature of changes.
+** Why a Fork?
+- Faster development process with low-friction experimental branch
+- Less commitment to future dead weight or counterproductive features
+- Opportunities to break architecture in aggressive, indelicate ways
 
+For the time being, no features should be considered stable.  Things that are considered unlikely to add value in the near future will be removed rather than maintained.  Broken features are likely to be removed rather than caught up.
+*** Known Areas of Overhaul
+New work will focus on innovative frontend behaviors, especially the re-use of a context and use of multiple system prompts for multi-step operations, creating a more programmable, computer-like LLM behavior.
+
+The existing GPTel frontend will be split off as much as possible.  To avoid re-tangling the front-end, new frontend features will be gathered into a new package.  The generally useful pieces of frontend will remain in this package to be used by many independent frontends, but without the reference implementation within GPTel itself.
+
+We want to offload backend onto the LLM package or a fork of it eventually.  The frontend and backends are currently slightly tangled.  There's some duplication of work with the LLM package, which is itself restricted by copyright assignment and being an ELPA package, though it seems to be fine to build on top.
+
+The existingt GPTel frontend features, such as re-write, are using an older style of prompt that make them produce not-so-great replacements (the LLM is over-constrained on thinking / step-by-step behavior).
+
+~gptel-request~ supports several behaviors through let bindings only.  Many customize options should instead be arguments.  While we can lexical scope them, customize variables create bad usage patterns.
+
+Peristence will be removed.  Chat logs are basically no more beneficial than process output.  We use it to debug, but ultimately the output is what we are working on, not the chat that was used to create it.
+
+Introspection of this package itself using tools will be added.  This should aid in onboarding new contributors and help velocity.
+** Installation
+*Do not simply use MELPA or ELPA.  That points to the original fork*
+#+begin_src elisp
+  ;; package-vc
+  (package-vc-install
+   '(gptel
+     :url "https://github.com/positron-solutions/gptel.git"))
+
+  ;; using elpaca with explicit recipe
+  (use-package gptel
+    :ensure (gptel :host github
+                   :repo "positron-solutions/gptel"))
+
+  ;; straight with explicit recipe
+  (use-package gptel
+    :straight (gptel :type git :host github
+                     :repo "positron-solutions/gptel"))
+
+  ;; or use manual load-path & require, you brave yak shaver
+#+end_src
+** Continue Old Readme
 gptel is a simple Large Language Model chat client for Emacs, with support for multiple models and backends.  It works in the spirit of Emacs, available at any time and uniformly in any buffer.
 
 #+html: <div align="center">
