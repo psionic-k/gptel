@@ -50,7 +50,6 @@
 (declare-function gptel-backend-name "gptel")
 (declare-function gptel--parse-buffer "gptel")
 (declare-function gptel--parse-directive "gptel")
-(declare-function gptel--restore-props "gptel")
 (declare-function org-entry-get "org")
 (declare-function org-entry-put "org")
 (declare-function org-with-wide-buffer "org-macs")
@@ -309,132 +308,6 @@ for inclusion into the user prompt for the gptel request."
          (<= (- (org-element-property :contents-end par)
                 (org-element-property :end object))
              1))))
-
-(defun gptel-org--send-with-props (send-fun &rest args)
-  "Conditionally modify SEND-FUN's calling environment.
-
-If in an Org buffer under a heading containing a stored gptel
-configuration, use that for requests instead.  This includes the
-system message, model and provider (backend), among other
-parameters.
-
-ARGS are the original function call arguments."
-  (if (derived-mode-p 'org-mode)
-      (pcase-let ((`(,gptel--system-message ,gptel-backend ,gptel-model
-                     ,gptel-temperature ,gptel-max-tokens)
-                   (seq-mapn (lambda (a b) (or a b))
-                             (gptel-org--entry-properties)
-                             (list gptel--system-message gptel-backend gptel-model
-                                   gptel-temperature gptel-max-tokens))))
-        (apply send-fun args))
-    (apply send-fun args)))
-
-(advice-add 'gptel-send :around #'gptel-org--send-with-props)
-(advice-add 'gptel--suffix-send :around #'gptel-org--send-with-props)
-
-;; ;; NOTE: Basic uses in org-mode are covered by advising gptel-send and
-;; ;; gptel--suffix-send.  For custom commands it might be necessary to advise
-;; ;; gptel-request instead.
-;; (advice-add 'gptel-request :around #'gptel-org--send-with-props)
-
-
-;;; Saving and restoring state
-(defun gptel-org--entry-properties (&optional pt)
-  "Find gptel configuration properties stored at PT."
-  (pcase-let
-      ((`(,system ,backend ,model ,temperature ,tokens ,num)
-         (mapcar
-          (lambda (prop) (org-entry-get (or pt (point)) prop 'selective))
-          '("GPTEL_SYSTEM" "GPTEL_BACKEND" "GPTEL_MODEL"
-            "GPTEL_TEMPERATURE" "GPTEL_MAX_TOKENS"
-            "GPTEL_NUM_MESSAGES_TO_SEND"))))
-    (when system
-      (setq system (string-replace "\\n" "\n" system)))
-    (when backend
-      (setq backend (alist-get backend gptel--known-backends
-                               nil nil #'equal)))
-    (when model (setq model (gptel--intern model)))
-    (when temperature
-      (setq temperature (gptel--to-number temperature)))
-    (when tokens (setq tokens (gptel--to-number tokens)))
-    (when num (setq num (gptel--to-number num)))
-    (list system backend model temperature tokens num)))
-
-(defun gptel-org--restore-state ()
-  "Restore gptel state for Org buffers when turning on `gptel-mode'."
-  (save-restriction
-    (widen)
-    (condition-case status
-        (progn
-          (when-let* ((bounds (org-entry-get (point-min) "GPTEL_BOUNDS")))
-            (gptel--restore-props (read bounds)))
-          (pcase-let ((`(,system ,backend ,model ,temperature ,tokens ,num)
-                       (gptel-org--entry-properties (point-min))))
-            (when system (setq-local gptel--system-message system))
-            (if backend (setq-local gptel-backend backend)
-              (message
-               (substitute-command-keys
-                (concat
-                 "Could not activate gptel backend \"%s\"!  "
-                 "Switch backends with \\[universal-argument] \\[gptel-send]"
-                 " before using gptel."))
-               backend))
-            (when model (setq-local gptel-model model))
-            (when temperature (setq-local gptel-temperature temperature))
-            (when tokens (setq-local gptel-max-tokens tokens))
-            (when num (setq-local gptel--num-messages-to-send num))))
-      (:success (message "gptel chat restored."))
-      (error (message "Could not restore gptel state, sorry! Error: %s" status)))))
-
-(defun gptel-org-set-properties (pt &optional msg)
-  "Store the active gptel configuration under the current heading.
-
-The active gptel configuration includes the current system
-message, language model and provider (backend), and additional
-settings when applicable.
-
-PT is the cursor position by default.  If MSG is
-non-nil (default), display a message afterwards."
-  (interactive (list (point) t))
-  (org-entry-put pt "GPTEL_MODEL" (gptel--model-name gptel-model))
-  (org-entry-put pt "GPTEL_BACKEND" (gptel-backend-name gptel-backend))
-  (unless (equal (default-value 'gptel-temperature) gptel-temperature)
-    (org-entry-put pt "GPTEL_TEMPERATURE"
-                   (number-to-string gptel-temperature)))
-  (when (natnump gptel--num-messages-to-send)
-    (org-entry-put pt "GPTEL_NUM_MESSAGES_TO_SEND"
-                   (number-to-string gptel--num-messages-to-send)))
-  (org-entry-put pt "GPTEL_SYSTEM"
-                 (and-let* ((msg (car-safe
-                                  (gptel--parse-directive
-                                   gptel--system-message))))
-                   (string-replace "\n" "\\n" msg)))
-  (when gptel-max-tokens
-    (org-entry-put
-     pt "GPTEL_MAX_TOKENS" (number-to-string gptel-max-tokens)))
-  (when msg
-    (message "Added gptel configuration to current headline.")))
-
-(defun gptel-org--save-state ()
-  "Write the gptel state to the Org buffer as Org properties."
-  (org-with-wide-buffer
-   (goto-char (point-min))
-   (when (org-at-heading-p)
-     (org-open-line 1))
-   (gptel-org-set-properties (point-min))
-   ;; Save response boundaries
-   (letrec ((write-bounds
-             (lambda (attempts)
-               (let* ((bounds (gptel--get-buffer-bounds))
-                      ;; first value of ((prop . ((beg end val)...))...)
-                      (offset (caadar bounds))
-                      (offset-marker (set-marker (make-marker) offset)))
-                 (org-entry-put (point-min) "GPTEL_BOUNDS"
-                                (prin1-to-string (gptel--get-buffer-bounds)))
-                 (when (and (not (= (marker-position offset-marker) offset))
-                            (> attempts 0))
-                   (funcall write-bounds (1- attempts)))))))
-     (funcall write-bounds 6))))
 
 
 ;;; Transforming responses

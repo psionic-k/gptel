@@ -18,7 +18,7 @@ The existingt GPTel frontend features, such as re-write, are using an older styl
 
 ~gptel-request~ supports several behaviors through let bindings only.  Many customize options should instead be arguments.  While we can lexical scope them, customize variables create bad usage patterns.
 
-Peristence will be removed.  Chat logs are basically no more beneficial than process output.  We use it to debug, but ultimately the output is what we are working on, not the chat that was used to create it.
+Chat peristence has been removed.  Chat logs are basically no more beneficial than process output.  We use it to debug, but ultimately the output is what we are working on, not the chat that was used to create it.
 
 Introspection of this package itself using tools will be added.  This should aid in onboarding new contributors and help velocity.
 ** Installation
@@ -152,7 +152,6 @@ gptel uses Curl if available, but falls back to the built-in url-retrieve to wor
     - [[#in-any-buffer][In any buffer:]]
     - [[#in-a-dedicated-chat-buffer][In a dedicated chat buffer:]]
       - [[#including-media-images-documents-with-requests][Including media (images, documents) with requests]]
-      - [[#save-and-restore-your-chat-sessions][Save and restore your chat sessions]]
     - [[#setting-options-backend-model-request-parameters-system-prompts-and-more][Setting options (backend, model, request parameters, system prompts and more)]]
     - [[#include-more-context-with-requests][Include more context with requests]]
     - [[#tool-use-experimental][Tool use (experimental)]]
@@ -1027,10 +1026,9 @@ Similar criteria apply to Markdown chat buffers.
 
 #+html: </details>
 #+html: <details><summary>
-**** Save and restore your chat sessions
 #+html: </summary>
 
-Saving the file will save the state of the conversation as well.  To resume the chat, open the file and turn on =gptel-mode= before editing the buffer.
+
 
 #+html: </details>
 *** Setting options (backend, model, request parameters, system prompts and more)

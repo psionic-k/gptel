@@ -51,7 +51,6 @@
 ;; - Supports conversations and multiple independent sessions.
 ;; - Supports tool-use to equip LLMs with agentic capabilities.
 ;; - Supports multi-modal models (send images, documents).
-;; - Save chats as regular Markdown/Org/Text files and resume them later.
 ;; - You can go back and edit your previous prompts or LLM responses when
 ;;   continuing a conversation.  These will be fed back to the model.
 ;; - Redirect prompts and responses easily
@@ -113,10 +112,6 @@
 ;;   model, or choose to redirect the input or output elsewhere (such as to the
 ;;   kill ring or the echo area).
 ;;
-;; - You can save this buffer to a file.  When opening this file, turn on
-;;   `gptel-mode' before editing it to restore the conversation state and
-;;   continue chatting.
-;;
 ;; - To include media files with your request, you can add them to the context
 ;;   (described next), or include them as links in Org or Markdown mode chat
 ;;   buffers.  Sending media is disabled by default, you can turn it on globally
@@ -174,8 +169,6 @@
 (declare-function org-escape-code-in-string "org-src")
 (declare-function gptel-org--create-prompt "gptel-org")
 (declare-function gptel-org-set-topic "gptel-org")
-(declare-function gptel-org--save-state "gptel-org")
-(declare-function gptel-org--restore-state "gptel-org")
 (declare-function gptel--stream-convert-markdown->org "gptel-org")
 (declare-function gptel--convert-markdown->org "gptel-org")
 (define-obsolete-function-alias
@@ -330,14 +323,6 @@ at the time of the request."
 
 This hook is called in the buffer from which the prompt was sent
 to the LLM, and after a text insertion."
-  :type 'hook)
-
-(defcustom gptel-save-state-hook nil
-  "Hook run before gptel saves model parameters to a file.
-
-You can use this hook to store additional conversation state or
-model parameters to the chat buffer, or to modify the buffer in
-some other way."
   :type 'hook)
 
 (defcustom gptel-default-mode (if (fboundp 'markdown-mode)
@@ -1137,96 +1122,6 @@ Valid JSON unless NO-JSON is t."
       (unless no-json (ignore-errors (json-pretty-print p (point)))))))
 
 
-;;; Saving and restoring state
-
-(defun gptel--restore-props (bounds-alist)
-  "Restore text properties from BOUNDS-ALIST.
-BOUNDS-ALIST is (PROP . BOUNDS).  BOUNDS is a list of BOUND.  Each BOUND
-is either (BEG END VAL) or (BEG END).
-
-For (BEG END VAL) forms, even if VAL is nil, the gptel property will be
-set to (PROP . VAL).  For (BEG END) forms, except when PROP is response,
-the gptel property is set to just PROP.
-
-The legacy structure, a list of (BEG . END) is also supported and will be
-applied before being re-persisted in the new structure."
-  (if (symbolp (caar bounds-alist))
-      (mapc
-       (lambda (bounds)
-         (let* ((prop (pop bounds)))
-           (mapc
-            (lambda (bound)
-              (let ((prop-has-val (> (length bound) 2)))
-                (add-text-properties
-                 (pop bound) (pop bound)
-                 (if (eq prop 'response)
-                     '(gptel response front-sticky (gptel))
-                   (list 'gptel
-                         (if prop-has-val
-                             (cons prop (pop bound))
-                           prop))))))
-            bounds)))
-       bounds-alist)
-    (mapc (lambda (bound)
-            (add-text-properties
-             (car bound) (cdr bound) '(gptel response front-sticky (gptel))))
-          bounds-alist)))
-
-(defun gptel--restore-state ()
-  "Restore gptel state when turning on `gptel-mode'."
-  (when (buffer-file-name)
-    (if (derived-mode-p 'org-mode)
-        (progn
-          (require 'gptel-org)
-          (gptel-org--restore-state))
-      (when gptel--bounds
-        (gptel--restore-props gptel--bounds)
-        (message "gptel chat restored."))
-      (when gptel--backend-name
-        (if-let* ((backend (alist-get
-                            gptel--backend-name gptel--known-backends
-                            nil nil #'equal)))
-            (setq-local gptel-backend backend)
-          (message
-           (substitute-command-keys
-            (concat
-             "Could not activate gptel backend \"%s\"!  "
-             "Switch backends with \\[universal-argument] \\[gptel-send]"
-             " before using gptel."))
-           gptel--backend-name))))))
-
-(defun gptel--save-state ()
-  "Write the gptel state to the buffer.
-
-This saves chat metadata when writing the buffer to disk.  To
-restore a chat session, turn on `gptel-mode' after opening the
-file."
-  (run-hooks 'gptel-save-state-hook)
-  (if (derived-mode-p 'org-mode)
-      (progn
-        (require 'gptel-org)
-        (gptel-org--save-state))
-    (let ((print-escape-newlines t))
-      (save-excursion
-        (save-restriction
-          (add-file-local-variable 'gptel-model gptel-model)
-          (add-file-local-variable 'gptel--backend-name
-                                   (gptel-backend-name gptel-backend))
-          (unless (equal (default-value 'gptel-temperature) gptel-temperature)
-            (add-file-local-variable 'gptel-temperature gptel-temperature))
-          (unless (equal (default-value 'gptel--system-message)
-                           gptel--system-message)
-            (add-file-local-variable
-             'gptel--system-message
-             (car-safe (gptel--parse-directive gptel--system-message))))
-          (when gptel-max-tokens
-            (add-file-local-variable 'gptel-max-tokens gptel-max-tokens))
-          (when (natnump gptel--num-messages-to-send)
-            (add-file-local-variable 'gptel--num-messages-to-send
-                                     gptel--num-messages-to-send))
-          (add-file-local-variable 'gptel--bounds (gptel--get-buffer-bounds)))))))
-
-
 ;;; Minor mode and UI
 
 ;; NOTE: It's not clear that this is the best strategy:
@@ -1245,11 +1140,9 @@ file."
         (unless (derived-mode-p 'org-mode 'markdown-mode 'text-mode)
           (gptel-mode -1)
           (user-error (format "`gptel-mode' is not supported in `%s'." major-mode)))
-        (add-hook 'before-save-hook #'gptel--save-state nil t)
         (when (derived-mode-p 'org-mode)
           ;; Work around bug in `org-fontify-extend-region'.
           (add-hook 'gptel-post-response-functions #'gptel--font-lock-update nil t))
-        (gptel--restore-state)
         (if gptel-use-header-line
           (setq gptel--old-header-line header-line-format
                 header-line-format
@@ -1338,7 +1231,6 @@ file."
                 '(:eval (concat " "
                          (buttonize (gptel--model-name gptel-model)
                             (lambda (&rest _) (gptel-menu))))))))
-    (remove-hook 'before-save-hook #'gptel--save-state t)
     (if gptel-use-header-line
         (setq header-line-format gptel--old-header-line
               gptel--old-header-line nil)
